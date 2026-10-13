@@ -11,12 +11,38 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom Styling CSS agar Tombol Menjadi Berwarna Mencolok
+st.markdown("""
+<style>
+/* Styling Tombol Form Submit Primary */
+div.stButton > button[kind="primary"],
+div[data-testid="stFormSubmitButton"] > button {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(30, 60, 114, 0.35) !important;
+    transition: all 0.3s ease !important;
+}
+
+div.stButton > button[kind="primary"]:hover,
+div[data-testid="stFormSubmitButton"] > button:hover {
+    background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(30, 60, 114, 0.45) !important;
+    color: #ffffff !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Fungsi Memuat Model Machine Learning
 @st.cache_resource
 def load_trained_model():
     model_path = os.path.join("model", "student_dropout_model.pkl")
     if not os.path.exists(model_path):
-        # Jalur alternatif jika file berada di root direktori
         model_path = "student_dropout_model.pkl"
     return joblib.load(model_path)
 
@@ -96,10 +122,9 @@ if menu == "Prediksi Individual (Formulir)":
             sem2_approved = st.number_input("SKS Lulus Semester 2:", min_value=0, max_value=30, value=4)
             sem2_grade = st.number_input("Rata-rata Nilai Semester 2 (Skala 0 - 20):", min_value=0.0, max_value=20.0, value=11.5)
 
-        submit_button = st.form_submit_button("Analisis Risiko Mahasiswa", use_container_width=True)
+        submit_button = st.form_submit_button("🔍 Analisis Risiko Mahasiswa", type="primary", use_container_width=True)
 
     if submit_button:
-        # Menyiapkan payload fitur sesuai 35 kolom dataset asli
         input_data = {
             'Marital_status': [1],
             'Application_mode': [1],
@@ -191,8 +216,7 @@ else:
         st.write(f"**Data Berhasil Dimuat:** {batch_df.shape[0]} baris ditemukan.")
         st.dataframe(batch_df.head())
 
-        if st.button("Jalankan Prediksi Seluruh Data", type="primary"):
-            # Buang kolom target jika ada pada data uji
+        if st.button("🚀 Jalankan Prediksi Seluruh Data", type="primary"):
             features_to_predict = batch_df.drop(columns=['Status', 'Target', 'is_dropout'], errors='ignore')
 
             predictions = model.predict(features_to_predict)
@@ -205,7 +229,6 @@ else:
             st.divider()
             st.subheader("📊 Hasil Evaluasi Mahasiswa")
 
-            # Ringkasan KPI Batch
             kpi1, kpi2, kpi3 = st.columns(3)
             total_students = len(results)
             dropout_count = sum(predictions == 1)
@@ -215,11 +238,9 @@ else:
             kpi2.metric("Berpotensi Dropout", dropout_count, delta=f"{(dropout_count/total_students)*100:.1f}%", delta_color="inverse")
             kpi3.metric("Berpotensi Lulus", graduate_count)
 
-            # Tampilkan Tabel Hasil
             output_cols = ['Prediksi Status', 'Probabilitas Dropout (%)'] + [c for c in batch_df.columns if c not in ['Prediksi Status', 'Probabilitas Dropout (%)']]
             st.dataframe(results[output_cols])
 
-            # Tombol Unduh Hasil
             csv_export = results[output_cols].to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="📥 Unduh Hasil Prediksi (CSV)",
