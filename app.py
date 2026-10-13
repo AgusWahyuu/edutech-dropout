@@ -1,66 +1,110 @@
-import streamlit as st
-import pandas as pd
-import joblib
 import os
+import joblib
+import pandas as pd
+import streamlit as st
 
-# Konfigurasi Halaman
+# Konfigurasi Halaman Streamlit
 st.set_page_config(
-    page_title="Early Warning System Dropout Siswa | Jaya Jaya Institut",
+    page_title="Dropout Early Warning System - Jaya Jaya Institut",
     page_icon="🎓",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Load Model Pipeline
+# Fungsi Memuat Model Machine Learning
 @st.cache_resource
-def load_model():
+def load_trained_model():
     model_path = os.path.join("model", "student_dropout_model.pkl")
+    if not os.path.exists(model_path):
+        # Jalur alternatif jika file berada di root direktori
+        model_path = "student_dropout_model.pkl"
     return joblib.load(model_path)
 
 try:
-    model = load_model()
+    model = load_trained_model()
 except Exception as e:
-    st.error(f"Gagal memuat model: {e}. Pastikan model/student_dropout_model.pkl tersedia.")
+    st.error(f"Gagal memuat model: {e}")
+    st.info("Pastikan berkas model 'student_dropout_model.pkl' sudah disimpan di dalam folder 'model/'.")
     st.stop()
 
-# Header Dashboard
+# Header Aplikasi
 st.title("🎓 Jaya Jaya Institut - Dropout Early Warning System")
 st.markdown("""
-Sistem deteksi dini performa akademik mahasiswa untuk mengidentifikasi indikasi putus kuliah (*dropout*) 
-sejak dini sehingga pihak kampus dapat segera memberikan pendampingan akademik dan konseling finansial.
+Aplikasi sistem deteksi dini untuk memprediksi potensi keberhasilan studi mahasiswa (**Dropout** vs **Graduate**). 
+Sistem ini memanfaatkan algoritma Machine Learning terlatih untuk membantu dosen pembimbing akademik dan pihak manajemen 
+dalam memberikan intervensi tepat waktu sebelum mahasiswa memutuskan berhenti kuliah.
 """)
 
-st.sidebar.header("Pilihan Mode Prediksi")
-mode = st.sidebar.radio("Metode Input:", ["Prediksi Individual", "Batch Prediksi (Upload CSV)"])
+st.sidebar.header("Pilihan Navigasi")
+menu = st.sidebar.radio(
+    "Pilih Mode Evaluasi:",
+    ["Prediksi Individual (Formulir)", "Prediksi Massal (Unggah Berkas CSV)"]
+)
 
-if mode == "Prediksi Individual":
-    st.subheader("📋 Form Data Mahasiswa")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        age = st.number_input("Usia Saat Masuk (Age at enrollment)", min_value=16, max_value=70, value=20)
-        gender = st.selectbox("Jenis Kelamin", options=[1, 0], format_func=lambda x: "Laki-laki" if x == 1 else "Perempuan")
-        scholarship = st.selectbox("Penerima Beasiswa", options=[1, 0], format_func=lambda x: "Ya" if x == 1 else "Tidak")
-        debtor = st.selectbox("Memiliki Tunggakan/Hutang", options=[0, 1], format_func=lambda x: "Ada Tunggakan" if x == 1 else "Lunas / Bebas Hutang")
-        tuition_fees = st.selectbox("SPP Terbayar Tepat Waktu", options=[1, 0], format_func=lambda x: "Ya (Lunas)" if x == 1 else "Tidak (Menunggak)")
+# Mapping Jurusan untuk Input Formulir
+COURSE_OPTIONS = {
+    33: "Biofuel Production Technologies",
+    171: "Animation and Multimedia Design",
+    8014: "Social Service (evening attendance)",
+    9003: "Agronomy",
+    9070: "Communication Design",
+    9085: "Veterinary Nursing",
+    9119: "Informatics Engineering",
+    9130: "Equinculture",
+    9147: "Management",
+    9238: "Social Service",
+    9254: "Tourism",
+    9500: "Nursing",
+    9556: "Oral Hygiene",
+    9670: "Advertising and Marketing Management",
+    9773: "Journalism and Communication",
+    9853: "Basic Education",
+    9991: "Management (evening attendance)"
+}
 
-    with col2:
-        sem1_enrolled = st.number_input("SKS Diambil Semester 1", min_value=0, max_value=30, value=6)
-        sem1_approved = st.number_input("SKS Lulus Semester 1", min_value=0, max_value=30, value=5)
-        sem1_grade = st.number_input("Rata-rata Nilai Semester 1 (Skala 0-20)", min_value=0.0, max_value=20.0, value=12.5)
-        admission_grade = st.number_input("Nilai Seleksi Masuk (Admission Grade)", min_value=0.0, max_value=200.0, value=125.0)
+# MODE 1: PREDIKSI INDIVIDUAL
+if menu == "Prediksi Individual (Formulir)":
+    st.subheader("📋 Input Data Indikator Mahasiswa")
+    st.caption("Masukkan data profil demografi, status finansial, dan capaian akademik semester awal mahasiswa.")
 
-    with col3:
-        sem2_enrolled = st.number_input("SKS Diambil Semester 2", min_value=0, max_value=30, value=6)
-        sem2_approved = st.number_input("SKS Lulus Semester 2", min_value=0, max_value=30, value=4)
-        sem2_grade = st.number_input("Rata-rata Nilai Semester 2 (Skala 0-20)", min_value=0.0, max_value=20.0, value=11.5)
+    with st.form("individual_form"):
+        col1, col2, col3 = st.columns(3)
 
-    if st.button("Jalankan Prediksi Risiko", type="primary"):
-        # Format input disesuaikan dengan skema fitur dataset asli
-        input_dict = {
+        with col1:
+            st.markdown("**Profil Mahasiswa & Finansial**")
+            course_id = st.selectbox(
+                "Program Studi / Jurusan:",
+                options=list(COURSE_OPTIONS.keys()),
+                format_func=lambda x: f"{x} - {COURSE_OPTIONS[x]}"
+            )
+            age = st.number_input("Usia Saat Masuk Kuliah:", min_value=15, max_value=70, value=20)
+            gender = st.selectbox("Jenis Kelamin:", options=[1, 0], format_func=lambda x: "Laki-laki" if x == 1 else "Perempuan")
+            tuition_fees = st.selectbox("Status SPP:", options=[1, 0], format_func=lambda x: "Lunas / Tepat Waktu" if x == 1 else "Menunggak")
+            debtor = st.selectbox("Status Hutang / Pinjaman:", options=[0, 1], format_func=lambda x: "Bebas Tunggakan" if x == 0 else "Ada Tunggakan")
+            scholarship = st.selectbox("Penerima Beasiswa:", options=[1, 0], format_func=lambda x: "Ya (Penerima)" if x == 1 else "Tidak")
+
+        with col2:
+            st.markdown("**Performa Akademik Semester 1**")
+            admission_grade = st.number_input("Nilai Seleksi Masuk (0 - 200):", min_value=0.0, max_value=200.0, value=125.0)
+            sem1_enrolled = st.number_input("SKS Diambil Semester 1:", min_value=0, max_value=30, value=6)
+            sem1_approved = st.number_input("SKS Lulus Semester 1:", min_value=0, max_value=30, value=5)
+            sem1_grade = st.number_input("Rata-rata Nilai Semester 1 (Skala 0 - 20):", min_value=0.0, max_value=20.0, value=12.5)
+
+        with col3:
+            st.markdown("**Performa Akademik Semester 2**")
+            sem2_enrolled = st.number_input("SKS Diambil Semester 2:", min_value=0, max_value=30, value=6)
+            sem2_approved = st.number_input("SKS Lulus Semester 2:", min_value=0, max_value=30, value=4)
+            sem2_grade = st.number_input("Rata-rata Nilai Semester 2 (Skala 0 - 20):", min_value=0.0, max_value=20.0, value=11.5)
+
+        submit_button = st.form_submit_button("Analisis Risiko Mahasiswa", use_container_width=True)
+
+    if submit_button:
+        # Menyiapkan payload fitur sesuai 35 kolom dataset asli
+        input_data = {
             'Marital_status': [1],
             'Application_mode': [1],
             'Application_order': [1],
-            'Course': [9500],
+            'Course': [course_id],
             'Daytime_evening_attendance': [1],
             'Previous_qualification': [1],
             'Previous_qualification_grade': [120.0],
@@ -94,40 +138,92 @@ if mode == "Prediksi Individual":
             'Inflation_rate': [1.4],
             'GDP': [1.74]
         }
-        
-        input_df = pd.DataFrame(input_dict)
-        pred = model.predict(input_df)[0]
-        prob = model.predict_proba(input_df)[0][1]
+
+        input_df = pd.DataFrame(input_data)
+        prediction = model.predict(input_df)[0]
+        probabilities = model.predict_proba(input_df)[0]
+        dropout_proba = probabilities[1]
 
         st.divider()
-        if pred == 1:
-            st.error(f"🚨 **Peringatan Risiko Tinggi: Mahasiswa Berpotensi Dropout!**")
-            st.metric("Probabilitas Dropout", f"{prob * 100:.2f}%")
-            st.warning("Rekomendasi Tindakan Segera: Jadwalkan bimbingan konseling akademik dan pemeriksaan kendala keuangan.")
-        else:
-            st.success(f"✅ **Risiko Rendah: Mahasiswa Cenderung Menyelesaikan Studi.**")
-            st.metric("Probabilitas Aman", f"{(1 - prob) * 100:.2f}%")
+        res_col1, res_col2 = st.columns([1, 2])
 
+        with res_col1:
+            if prediction == 1:
+                st.error("### 🚨 Potensi Risiko: DROPOUT")
+                st.metric("Tingkat Risiko Dropout", f"{dropout_proba * 100:.2f}%")
+            else:
+                st.success("### ✅ Potensi Keberhasilan: GRADUATE")
+                st.metric("Peluang Kelulusan", f"{(1 - dropout_proba) * 100:.2f}%")
+
+        with res_col2:
+            st.markdown("**Rekomendasi Tindakan Cepat:**")
+            if prediction == 1:
+                st.warning("""
+                - **Intervensi Finansial Segera:** Lakukan konfirmasi apakah mahasiswa mengalami kendala SPP atau tunggakan hutang. Tawarkan skema cicilan atau beasiswa darurat.
+                - **Pendampingan Akademik:** Jadwalkan konsultasi khusus bersama Dosen Wali untuk mengevaluasi rendahnya perolehan SKS di semester awal.
+                """)
+            else:
+                st.info("""
+                - Mahasiswa berada dalam jalur akademik yang sehat.
+                - Pertahankan performa dengan monitoring berkala di setiap akhir semester.
+                """)
+
+# MODE 2: BATCH PREDICTION
 else:
-    st.subheader("📂 Batch Prediksi via CSV")
-    uploaded_file = st.file_uploader("Unggah file CSV data mahasiswa", type=["csv"])
+    st.subheader("📂 Batch Prediksi Mahasiswa Aktif (Enrolled)")
+    st.markdown("""
+    Unggah berkas CSV yang berisi data mahasiswa (seperti data `unseen_enrolled_students.csv` yang telah dipisahkan saat tahap Data Preparation) 
+    untuk memproses evaluasi risiko seluruh mahasiswa aktif secara bersamaan.
+    """)
+
+    uploaded_file = st.file_uploader("Unggah File Data CSV:", type=["csv"])
+
     if uploaded_file is not None:
         try:
             batch_df = pd.read_csv(uploaded_file, sep=';')
             if batch_df.shape[1] == 1:
                 uploaded_file.seek(0)
                 batch_df = pd.read_csv(uploaded_file, sep=',')
-        except:
+        except Exception:
             uploaded_file.seek(0)
             batch_df = pd.read_csv(uploaded_file)
 
-        st.write("Data Berhasil Dimuat:", batch_df.head())
-        if st.button("Proses Seluruh Data"):
-            clean_test = batch_df.drop(columns=['Status'], errors='ignore')
-            preds = model.predict(clean_test)
-            probs = model.predict_proba(clean_test)[:, 1]
+        st.write(f"**Data Berhasil Dimuat:** {batch_df.shape[0]} baris ditemukan.")
+        st.dataframe(batch_df.head())
 
-            batch_df['Prediksi_Dropout'] = ["Dropout" if p == 1 else "Aman" for p in preds]
-            batch_df['Probabilitas_Dropout'] = [f"{p*100:.2f}%" for p in probs]
+        if st.button("Jalankan Prediksi Seluruh Data", type="primary"):
+            # Buang kolom target jika ada pada data uji
+            features_to_predict = batch_df.drop(columns=['Status', 'Target', 'is_dropout'], errors='ignore')
 
-            st.dataframe(batch_df[['Prediksi_Dropout', 'Probabilitas_Dropout'] + [c for c in batch_df.columns if c not in ['Prediksi_Dropout', 'Probabilitas_Dropout']]])
+            predictions = model.predict(features_to_predict)
+            probabilities = model.predict_proba(features_to_predict)[:, 1]
+
+            results = batch_df.copy()
+            results['Prediksi Status'] = ["Dropout" if p == 1 else "Graduate" for p in predictions]
+            results['Probabilitas Dropout (%)'] = [round(p * 100, 2) for p in probabilities]
+
+            st.divider()
+            st.subheader("📊 Hasil Evaluasi Mahasiswa")
+
+            # Ringkasan KPI Batch
+            kpi1, kpi2, kpi3 = st.columns(3)
+            total_students = len(results)
+            dropout_count = sum(predictions == 1)
+            graduate_count = sum(predictions == 0)
+
+            kpi1.metric("Total Mahasiswa Dievaluasi", total_students)
+            kpi2.metric("Berpotensi Dropout", dropout_count, delta=f"{(dropout_count/total_students)*100:.1f}%", delta_color="inverse")
+            kpi3.metric("Berpotensi Lulus", graduate_count)
+
+            # Tampilkan Tabel Hasil
+            output_cols = ['Prediksi Status', 'Probabilitas Dropout (%)'] + [c for c in batch_df.columns if c not in ['Prediksi Status', 'Probabilitas Dropout (%)']]
+            st.dataframe(results[output_cols])
+
+            # Tombol Unduh Hasil
+            csv_export = results[output_cols].to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Unduh Hasil Prediksi (CSV)",
+                data=csv_export,
+                file_name="hasil_prediksi_mahasiswa.csv",
+                mime="text/csv"
+            )
